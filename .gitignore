@@ -4,3 +4,4 @@ __pycache__/
 .env
 /related-papers
 figures/
+.ruff_cache/
