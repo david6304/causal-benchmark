@@ -325,3 +325,241 @@ against rather than an argument.
 One practical note before any of this runs. `preds.jsonl` currently holds a single
 run keyed only by doc_id, so repeats or a second condition would overwrite it. It
 needs a run or condition identifier before the first noise comparison, not after.
+
+## 2026-09-17 — ReCITE read: the recoverability problem
+
+Sangyeok's worry about ReCITE (Saklad et al., arXiv 2505.18931, `related-papers/recite.pdf`)
+looks well founded, and the paper carries its own evidence for it. Not confirmed
+independently, but enough that we should stop treating their headline number as a
+difficulty target.
+
+- Explicitness per node averages **0.877**, on a scale where a node is explicit,
+  implicit, or **absent**. So roughly one node in eight does not appear in the
+  source text at all, and edges into those nodes cannot be recovered by reading.
+- §4.2: "while 85-90% of generated edges have some textual support, only 17-33%
+  match ground-truth edges." They read this as models producing plausible but
+  incorrect relations. The competing reading -- that the ground-truth graph is
+  underdetermined by the text -- is equally consistent with it and they do not
+  rule it out.
+- The only recoverability check is a single expert case study (App. N). Nothing
+  systematic.
+- Scale and form: 25.0 +- 15.8 nodes (range 5-140), 37.4 +- 24.3 edges, ~40k
+  characters of text. 90.4% of the graphs contain feedback cycles, since they are
+  causal loop diagrams rather than DAGs. Scoring is LLM-as-judge (DeepSeek v3.2)
+  with semantic-similarity and abstraction-level matching.
+
+So the best-model F1 of 0.535 confounds model failure with task impossibility and
+should not be quoted as a target. What it does establish is that real-text
+extraction is somewhere far below our clean fictional ceiling, and their
+explicitness analysis (F1 roughly halves from the most to the least explicit bin)
+says where the difficulty lives.
+
+**Reading this as an opportunity rather than a criticism.** Our items are
+recoverable by construction, which is exactly what ReCITE cannot claim. If that
+holds up it is a contribution worth stating explicitly rather than assuming.
+Worth Sangyeok writing down what he actually checked.
+
+One useful design detail to steal: their name-assisted ablation (ground-truth node
+names supplied, Table 4) moves F1 only 0.535 -> 0.551 for the best model. That is
+their evidence that the bottleneck is relation extraction rather than entity
+recognition, and it is the same argument we would need if anyone objects that
+supplying the concept list makes our task artificial.
+
+## 2026-09-17 — noise taxonomy, and epistemic commitment as the first factor
+
+Reviewed our candidate noise axes against NoisyCausal (Xu & Fu, ACL 2026,
+`related-papers/noisy_causal.pdf`) and against a critical read from Codex. Current
+position, not settled.
+
+**NoisyCausal transfers less than hoped.** Their task is causal reasoning QA over a
+sampled SCM, so four of their six noise types (value perturbation, partial masking,
+causal swap, question perturbation) act on *observations* -- variable assignments
+the model is given. We give the model no data, only assertions, so those have no
+analogue. Irrelevant variable injection and latent confounders are the two that map
+across. Worth keeping as precedent: graphs 3-7 nodes, and a composition ablation
+(1 noise type 73.5% -> 2 types 67.3% -> all 6 58.0%) suggesting noise types should
+stack rather than form a single severity ladder.
+
+**The type we had missed: epistemic commitment.** Real documents constantly mention
+a causal proposition without endorsing it -- negation ("we found no evidence that
+X affects Y"), hypothesis ("X could adversely affect Y"), investigation ("we tested
+whether X drives Y"), and retraction ("initially suspected, subsequently ruled
+out"). Each contains the concept pair *and* an explicit causal cue while licensing
+no edge, which makes it a sharper false-positive probe than the comparative and
+co-occurrence rungs we had listed.
+
+This needs a labelling rule stated up front, otherwise the items are not labelable:
+**ground truth = positive, author-committed, direct causal claims.**
+
+Supporting evidence: **BioRelFact** (Gabryszak et al., LREC 2026,
+<https://aclanthology.org/2026.lrec-1.602/>), 1,767 expert-annotated biomedical
+sentences over nine relation types and five levels of epistemic commitment. Across
+eight LLMs, commitment classification is consistently the harder half of the same
+task -- best model GPT-OSS-20B scores F1 77.3 on the relation but 65.3 on
+commitment; GPT-4o 75.9 / 60.2. That is sentence-level and biomedical, so it is
+suggestive rather than a direct prediction for us, but it is the closest thing to
+evidence that commitment is separable from relation extraction and harder. No PDF
+held locally yet.
+
+**Revised working taxonomy**, three families rather than the seven rungs in the
+2026-09-15 entry:
+
+1. **Commitment** -- negation, hypothesis, investigation, retraction. Subsumes the
+   "assert then withdraw" device from the 09-15 false-edge discussion as one
+   subtype.
+2. **Non-causal relational distractors** -- association, prediction, temporal
+   order. Merges the old rungs 1 and 2.
+3. **Realisation** -- coordination density (several edges per sentence),
+   cross-sentence evidence with anaphora and aliasing, controlled paraphrase.
+
+Dropped or held for now, with reasons: *mediation phrasing* ("X affects Z through
+Y") asserts a total effect and does not cleanly say whether X->Z is a direct edge,
+so it confounds extraction with our graph semantics; *hedging as a severity level*
+is a labelling problem, not a level; *generic filler dilution* is a long-context
+test more than an extraction test, and distractor **confusability** probably
+matters more than word count; *multi-document* stays held, since it entangles
+cross-document concept identity as a second construct.
+
+Note that "one edge per sentence" in the current generation prompt is the most
+artificial thing about our documents and is family 3's job to relax. It is also
+the first thing a reviewer will attack.
+
+**Why the injected-false-edge idea needed reframing.** In a fictional domain an
+unqualified assertion of X->Y simply *is* ground truth -- it is a different graph,
+not noise. It only becomes noise under a discourse operator that blocks positive
+commitment, which is what family 1 provides. Source-reliability framing ("an
+unverified report claims...") was considered and set aside as source evaluation
+rather than extraction, though it returns in the longer-term design below.
+
+## 2026-09-17 — n=3 is structurally too easy, with numbers
+
+`evaluate.py` scores pairwise: each unordered pair is one categorical state
+(none / i->j / j->i), so SHD_max = C(n,2). The number of pairs available to carry a
+false-positive edge is therefore C(n,2) - m, not n(n-1) - m.
+
+Counted over the usable atoms:
+
+```
+n=3:  4 usable of 6 classes.  free pairs: 1 atom with 0, 3 atoms with 1
+n=4: 25 usable of 31 classes.  free pairs: 1 with 0, 6 with 1, 9 with 2, 8 with 3, 1 with 4
+```
+
+So the n=3 triangle has **no** pair on which an over-extraction error can land, and
+the other three have exactly one. Any noise family aimed at false positives is
+being measured at its weakest possible point. This is the argument for adding n=4
+to the pilot, and it is structural rather than a guess about difficulty.
+
+Caveat worth respecting: do not vary n and noise only together, or graph size,
+density and context length are confounded with the manipulation. Keep matched
+clean/noisy pairs at each n. Also report edge density, since false-positive
+opportunity depends on C(n,2) - m rather than on n alone.
+
+## 2026-09-17 — the longer-term shape, and the route from the pilot
+
+The eventual target, as currently framed: a corpus of real heterogeneous documents
+(literature, books, blogs, reports), from which a model extracts causal
+relationships without letting its prior knowledge override what the documents say.
+Everything below is a direction, not a decided design.
+
+**What that setting contains beyond single-document extraction.** Contradictions
+between documents; documents of differing reliability; and cases where the model's
+prior is *correct* and the document is wrong -- a typo, a transcription error, a
+document simply mistaken about something well established. One concrete application
+discussed earlier is reducing a Markov equivalence class after running a discovery
+algorithm, where the documents supply orientation evidence the data cannot.
+
+**The consequence for our metrics.** If the prior is sometimes right then "less
+prior reliance is better" is wrong, and the prior-reliance index from the 2026-09-08
+entry is not a pure bug measure. The quantity of interest becomes something closer
+to *calibrated deference*:
+
+| | document asserts X->Y | document asserts not-(X->Y), or is silent |
+| --- | --- | --- |
+| prior says X->Y | agreement, uninformative | does the prior override the text? |
+| prior says no edge | **the deployment case**: novel finding, must follow the text | agreement |
+
+The bottom-left cell is the one that matters for "extract from the literature
+without the prior overriding". The top-right is where a prior can legitimately help.
+Two implications if this framing survives: the plausible arm has to be unparked,
+since fictional concepts give only one column; and a binary adjacency may be the
+wrong output, because "assert the edge but flag it as contradicting strong prior
+knowledge" is a better behaviour than silently picking a side. Parked pending
+discussion with Sangyeok.
+
+**Why the commitment pilot is on the path rather than a detour.** A claim asserted
+and then retracted inside one document is the single-document form of a
+cross-document contradiction. It needs the same discourse machinery in the
+generator and the same labelling rule in the eval, but none of the aggregation
+scoring or source-reliability modelling. So the pilot buys the linguistic
+infrastructure for the multi-document trust arm at single-document cost.
+
+**Rough route, in order, none of it committed.** Commitment at n=3 and n=4 (the
+pilot) -> the other two noise families, stacked as NoisyCausal do -> unpark the
+plausible arm and measure the prior per item with the text-free control ->
+contradiction across documents with a trust signal -> ecological calibration
+against a small annotated real-document sample, so the synthetic mixture is
+weighted by observed frequency rather than by whatever avoids ceiling.
+
+**On defending the benchmark.** The strongest attack is that this measures
+obedience to LLM-authored prose over nonce symbols, and that synthetic robustness
+need not predict real extraction. Two cheap moves that help, both current thinking:
+describe the output as an **asserted direct-claim graph** rather than a discovered
+causal DAG, so a closed-world zero means "not positively asserted" rather than "no
+relationship exists"; and lean on guaranteed recoverability, which is precisely
+what ReCITE lacks. The heavier validation work -- real-document test set, matched
+authentic counterfactuals, predictive criterion validity, prospective transfer --
+is noted and deliberately not scheduled.
+
+## 2026-09-17 — commitment pilot wired up
+
+Implemented, not yet run against a model. Design in the entries above.
+
+**Corpus.** 38 template documents: n=3 (all 4 usable atoms) and n=4 (6 atoms), two
+domains, one draw each. 20 clean, 18 commitment. The n=3 triangle has no free pair
+so it appears in the clean condition only -- `documents.py` skips it rather than
+faking somewhere to put the claim.
+
+`ATOMS_N4` is a hand-picked six of the 25 usable n=4 atoms, all with at least two
+free pairs, spread over edge count 2-4 and shortcut-pair count 0-3. `n4_16` and
+`n4_23` are kept from the earlier smoke tests. Enumerating all 25 would quadruple
+generation for a pilot.
+
+**The manipulation.** One causal proposition about a non-edge pair, asserted under
+retraction: "An earlier survey reported that X causes Y; the present data do not
+support this." Ground truth is unchanged. The labelling rule is that only positive,
+author-committed, direct causal claims count as edges. The word budget is held
+fixed across conditions so the retracted claim displaces filler rather than
+lengthening the document -- otherwise length is confounded with the manipulation.
+
+**Primary metric: injected-pair FP**, whether the model asserts an edge on the one
+pair carrying the retracted claim, counted over the unordered pair. SHD and exact
+match dilute a single-pair manipulation by C(n,2). The new `--fake bait` mode
+quantifies that: a predictor that takes every bait still reads exact-match 20/38
+and mean SHD 0.474 corpus-wide, against 18/18 on the targeted metric. That is the
+argument for not repeating the 2026-09-15 mistake of reading a whole-graph score.
+
+**A confound now recorded rather than avoided.** The retracted claim sometimes
+lands on a pair that is already mediated (i -> k -> j), stacking commitment on the
+transitivity shortcut. At n=3 the chain has exactly one free pair and it is always
+the mediated one, so this cannot be avoided there. 5 of the 18 commitment items are
+affected; `injected_is_shortcut` is recorded per item so the analysis can split on
+it. Whether it should instead be controlled is an open question, better answered
+once we know if either pressure does anything.
+
+**Two fixes from the 2026-09-15 to-do list.** `results.jsonl` is now keyed by
+(doc_id, sample, noise) rather than doc_id alone, so repeats and conditions no
+longer overwrite; `-k` sets samples per item. And the stale claim in the
+`documents.py` docstring about the empty graph being kept is corrected -- it has an
+isolated node and is dropped by the filter.
+
+**Concept draws are now seeded per item** (`irng`), so adding a noise condition or
+a graph size no longer shifts every later document's concepts. Note this does not
+rescue the 2026-09-15 natural corpus: `base` is drawn at max(SIZES), which changed
+from 3 to 4, so all 38 natural passages regenerate and need their faithfulness
+hand-checked again. `natural.jsonl` still holds the old passages under the old
+doc_ids and they are simply not matched.
+
+**Still to do before the run.** Generate the 38 natural passages from
+`gen_prompts.jsonl`; hand-check faithfulness, in particular that the retracted
+claim is actually written as a retraction rather than as a plain assertion or
+dropped; then run Haiku at k=3 over both styles.

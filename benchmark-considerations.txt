@@ -25,3 +25,7 @@ Maybe we have a set of 10 or so small graphs hand designed to cover causal struc
 Probably its best to do real world, fictional, and anti-real world. For anti-real world if we flip a whole graph then model can notice everything is reversed. If we flip randomly we may not have a DAG - this could be fine? We could also sample acyclic permutations.
 
 For the small set we can enumerate all isomorphic DAGs for n=3,4 (only 6+31 total), precedent for this in Corr2Cause (Jin et al., ICLR 2024).
+
+If we do the MEC thing then maybe we want to use a semi fictional domain. Some real and some new made up ones since that is similar to real novel science.
+
+Do we ever want to test the LLMs prior ability? What if document has a typo or says something wrong that is well known?

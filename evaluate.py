@@ -1,13 +1,23 @@
 """Edge discovery: give a model the concepts and the document, score the graph.
 
 Everything except the model call, so it can be checked offline. `--fake` swaps
-in a synthetic prediction to exercise the whole path: `truth` should give SHD 0
-everywhere, `empty` and `transpose` should both give SHD = number of edges.
+in a synthetic prediction to exercise the whole path: `truth` gives SHD 0
+everywhere, `empty` and `transpose` both give SHD = number of edges, and `bait`
+takes every retracted claim at face value, which should drive injected-pair FP to
+100%. `-k` sets the number of samples per item.
 
-Scoring is SHD only for now. Defined pairwise: for each unordered pair {i, j}
-the relationship is one of none / i->j / j->i, and SHD counts the pairs where
-prediction and truth disagree. A reversed edge therefore costs 1, not 2.
-TODO: add edge P/R/F1, exact-match, and per-pair accuracy on shortcut_pairs.
+Scoring. SHD is defined pairwise: for each unordered pair {i, j} the relationship
+is one of none / i->j / j->i, and SHD counts the pairs where prediction and truth
+disagree. A reversed edge therefore costs 1, not 2.
+
+The pilot's primary metric is instead **injected-pair FP** -- whether the model
+asserts an edge on the one pair carrying a retracted claim. SHD and exact match
+are whole-graph scores, so they dilute a single-pair manipulation by C(n,2). The
+`bait` mode shows the size of that: a predictor that takes every bait still
+reads exact-match 20/38 and mean SHD 0.474 over the corpus, against 18/18 on the
+targeted metric.
+
+TODO: add edge P/R/F1 and per-pair accuracy on shortcut_pairs.
 
 The prompt departs from iTAG's discovery prompt in two ways. Theirs carries a
 worked example (temperature / drownings / ice cream) which is a fork, one of the
@@ -76,6 +86,21 @@ def shd(pred, true):
                for i in range(n) for j in range(i + 1, n))
 
 
+def injected_hit(pred, injected):
+    """Did the model put an edge on the pair carrying the retracted claim?
+
+    The pilot's primary metric, in preference to SHD or exact match. The
+    manipulation touches exactly one pair, so a whole-graph score dilutes it by
+    C(n,2) and stays near ceiling even when the model takes the bait. Counted
+    over the unordered pair, since asserting the retracted claim reversed is
+    still a false positive attributable to the manipulation.
+    """
+    if injected is None:
+        return None
+    i, j = injected
+    return int(bool(pred[i][j] or pred[j][i]))
+
+
 def predict(prompt, backend):
     """TODO: fill in once we know whether we are using an API or local weights.
 
@@ -100,35 +125,69 @@ def fake(r, mode):
         B = [[0] * n for _ in range(n)]
     elif mode == "transpose":
         B = [[A[j][i] for j in range(n)] for i in range(n)]
+    elif mode == "bait":                # truth, plus the retracted claim taken
+        B = [row[:] for row in A]       # at face value: checks the metric fires
+        if r["injected_pair"]:
+            B[r["injected_pair"][0]][r["injected_pair"][1]] = 1
     else:
         raise ValueError(mode)
     return json.dumps({"adjacency": B})
 
 
+def summarise(results, key):
+    """Break the run down by one record field."""
+    for value in sorted({x[key] for x in results}, key=str):
+        rs = [x for x in results if x[key] == value]
+        ok = [x for x in rs if x["pred"] is not None]
+        hits = [x["injected_hit"] for x in rs if x["injected_hit"] is not None]
+        line = (f"  {str(value):14s} n={len(rs):3d}  "
+                f"exact {sum(x['shd'] == 0 for x in ok)}/{len(ok)}  "
+                f"SHD {sum(x['shd'] for x in ok) / max(len(ok), 1):.3f}")
+        if hits:
+            line += f"  injected-pair FP {sum(hits)}/{len(hits)}"
+        print(line)
+
+
 if __name__ == "__main__":
     mode = sys.argv[sys.argv.index("--fake") + 1] if "--fake" in sys.argv else None
     backend = "local"                   # TODO: expose once decided
+    # Repeats. One sample per item cannot separate a noise effect from sampling
+    # noise, which is what the 2026-09-15 run could not do.
+    k = int(sys.argv[sys.argv.index("-k") + 1]) if "-k" in sys.argv else 1
 
     records = [json.loads(line) for line in open("docs.jsonl")]
 
     results = []
     for r in records:
         prompt = build_prompt(r)
-        raw = fake(r, mode) if mode else predict(prompt, backend)
-        pred = parse(raw, len(r["adjacency"]))
-        results.append({
-            "doc_id": r["doc_id"],
-            "condition": r["condition"],
-            "raw": raw,
-            "pred": pred,
-            "shd": None if pred is None else shd(pred, r["adjacency"]),
-        })
+        for sample in range(k):
+            raw = fake(r, mode) if mode else predict(prompt, backend)
+            pred = parse(raw, len(r["adjacency"]))
+            results.append({
+                # doc_id alone is not a key once there are repeats and noise
+                # conditions; the run is keyed by all three.
+                "doc_id": r["doc_id"],
+                "sample": sample,
+                "condition": r["condition"],
+                "noise": r["noise"],
+                "style": r["style"],
+                "graph_id": r["graph_id"],
+                "n": len(r["adjacency"]),
+                "injected_pair": r["injected_pair"],
+                "injected_is_shortcut": r.get("injected_is_shortcut", False),
+                "raw": raw,
+                "pred": pred,
+                "shd": None if pred is None else shd(pred, r["adjacency"]),
+                "injected_hit": None if pred is None
+                                else injected_hit(pred, r["injected_pair"]),
+            })
 
     with open("results.jsonl", "w") as f:
         for x in results:
             f.write(json.dumps(x) + "\n")
 
     ok = [x for x in results if x["pred"] is not None]
-    print(f"{len(results)} items, {len(results) - len(ok)} parse failures")
-    if ok:
-        print(f"mean SHD {sum(x['shd'] for x in ok) / len(ok):.3f}")
+    print(f"{len(results)} runs, {len(results) - len(ok)} parse failures")
+    for key in ("style", "noise", "n"):
+        print(f"\nby {key}:")
+        summarise(results, key)
