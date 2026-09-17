@@ -138,7 +138,7 @@ if __name__ == "__main__":
                 }
             )
 
-    with open("graphs.jsonl", "w") as f:
+    with open("data/graphs.jsonl", "w") as f:
         for r in records:
             f.write(json.dumps(r) + "\n")
 

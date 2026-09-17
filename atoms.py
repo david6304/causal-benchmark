@@ -103,7 +103,7 @@ if __name__ == "__main__":
                for n in (3, 4)
                for i, A in enumerate(enumerate_dags(n))]
 
-    with open("atoms.jsonl", "w") as f:
+    with open("data/atoms.jsonl", "w") as f:
         for r in records:
             f.write(json.dumps(r) + "\n")
 

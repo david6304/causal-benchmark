@@ -155,7 +155,7 @@ if __name__ == "__main__":
     # noise, which is what the 2026-09-15 run could not do.
     k = int(sys.argv[sys.argv.index("-k") + 1]) if "-k" in sys.argv else 1
 
-    records = [json.loads(line) for line in open("docs.jsonl")]
+    records = [json.loads(line) for line in open("data/docs.jsonl")]
 
     results = []
     for r in records:
@@ -182,7 +182,7 @@ if __name__ == "__main__":
                                 else injected_hit(pred, r["injected_pair"]),
             })
 
-    with open("results.jsonl", "w") as f:
+    with open("data/results.jsonl", "w") as f:
         for x in results:
             f.write(json.dumps(x) + "\n")
 

@@ -4,7 +4,7 @@
     draw_dag(A, labels=concepts)          # one graph
     plot_grid(records)                    # a jsonl's worth
 
-    python viz.py [graphs.jsonl] [out.png]
+    python viz.py [data/atoms.jsonl] [figures/atoms.png]
 """
 
 import json
@@ -98,11 +98,11 @@ def plot_grid(records, path="graphs.png", ncols=3):
     return path
 
 
-def load(path="graphs.jsonl"):
+def load(path="data/atoms.jsonl"):
     return [json.loads(line) for line in open(path)]
 
 
 if __name__ == "__main__":
-    src = sys.argv[1] if len(sys.argv) > 1 else "graphs.jsonl"
+    src = sys.argv[1] if len(sys.argv) > 1 else "data/atoms.jsonl"
     out = sys.argv[2] if len(sys.argv) > 2 else "graphs.png"
     print(plot_grid(load(src), out))

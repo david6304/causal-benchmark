@@ -3,8 +3,8 @@
 `template` is one sentence per edge -- the ceiling condition, deliberately not
 natural text. `natural` is LLM-written prose asserting the same edges, generated
 from the prompt in GEN_PROMPT (see log.md, 2026-09-15). There is no API wired up
-here, so this script writes the generation prompts to gen_prompts.jsonl and reads
-the passages back from natural.jsonl ({"doc_id": ..., "text": ...}) when that file
+here, so this script writes the generation prompts to data/gen_prompts.jsonl and reads
+the passages back from data/natural.jsonl ({"doc_id": ..., "text": ...}) when that file
 exists. Natural records are simply absent until it does.
 
 Atoms with an isolated node are excluded for now: every node must carry at least
@@ -112,7 +112,7 @@ the only sentence besides the ones above that may mention two quantities togethe
 # Real domains cannot use a pool: real concepts have a fixed true structure, so
 # you cannot draw three at random and get whichever atom you wanted. Each atom
 # gets a hand-picked triple with the node mapping fixed, listed as
-# [node 0, node 1, node 2] against that atom's edges in atoms.jsonl. These are
+# [node 0, node 1, node 2] against that atom's edges in data/atoms.jsonl. These are
 # candidates pending the text-free prior screen, not settled ground truth.
 REAL_DOMAINS = {
     "cardio": ("Cardiovascular and respiratory epidemiology", {
@@ -223,7 +223,7 @@ def generation_prompt(edges, concepts, label, n, rng, injected=None):
 if __name__ == "__main__":
     rng = random.Random(SEED)
 
-    atoms = [json.loads(line) for line in open("atoms.jsonl")]
+    atoms = [json.loads(line) for line in open("data/atoms.jsonl")]
     atoms = [a for a in atoms if a["isolated"] == 0]     # see module docstring
     atoms = [a for a in atoms if a["n"] != 4 or a["graph_id"] in ATOMS_N4]
     domains = list(DOMAINS.items())[:N_DOMAINS]
@@ -307,9 +307,9 @@ if __name__ == "__main__":
     # Natural counterparts: same graph, same concepts, same node mapping, so the
     # two styles are matched and the template arm is the ceiling for its pair.
     natural = {}
-    if os.path.exists("natural.jsonl"):
+    if os.path.exists("data/natural.jsonl"):
         natural = {r["doc_id"]: r["text"]
-                   for r in map(json.loads, open("natural.jsonl"))}
+                   for r in map(json.loads, open("data/natural.jsonl"))}
 
     prompts = []
     for r in list(records):
@@ -325,11 +325,11 @@ if __name__ == "__main__":
                             "listed_order": order,
                             "text": natural[doc_id]})
 
-    with open("gen_prompts.jsonl", "w") as f:
+    with open("data/gen_prompts.jsonl", "w") as f:
         for p in prompts:
             f.write(json.dumps(p) + "\n")
 
-    with open("docs.jsonl", "w") as f:
+    with open("data/docs.jsonl", "w") as f:
         for r in records:
             f.write(json.dumps(r) + "\n")
 
@@ -339,7 +339,7 @@ if __name__ == "__main__":
         for noise in NOISES:
             print(f"  {noise:11s} "
                   f"{sum(1 for r in rs if r['noise'] == noise):3d}")
-    print(f"\n{len(prompts)} generation prompts -> gen_prompts.jsonl")
+    print(f"\n{len(prompts)} generation prompts -> data/gen_prompts.jsonl")
     missing = [p["doc_id"] for p in prompts if p["doc_id"] not in natural]
     if missing:
         print(f"{len(missing)} passages still to generate")

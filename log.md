@@ -563,3 +563,20 @@ doc_ids and they are simply not matched.
 `gen_prompts.jsonl`; hand-check faithfulness, in particular that the retracted
 claim is actually written as a retraction rather than as a plain assertion or
 dropped; then run Haiku at k=3 over both styles.
+
+## 2026-09-17 — repo tidied
+
+Structure is now scripts at root, generated artefacts in `data/`, figures in
+`figures/` (gitignored, all regenerable from `viz.py`), PDFs in `related-papers/`
+(gitignored, they do not belong in the history).
+
+Deleted: `preds.jsonl`, superseded now that `results.jsonl` carries `raw` and
+`pred` per run; `natural.jsonl`, whose doc_ids no longer match after the n=4 move
+and which regenerates anyway; `graphs.jsonl` and `graphs.png`, outputs of
+`sample_graphs.py`, which nothing currently uses. All recoverable from commit
+7d06741 if any of it turns out to be wanted.
+
+`sample_graphs.py` itself is kept although unused. It holds the iTAG-style ER
+sampling plus confounder / collider / mediator injection, which is the route to
+graphs larger than n=4 that `benchmark-considerations.txt` asks for, and that
+design is easier to keep in the tree than to find again in the history.
