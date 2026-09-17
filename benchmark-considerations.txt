@@ -1,0 +1,27 @@
+Initially follow iTAG paper closely but using fictional domains. We want an easy baseline to validate the pipeline and figure out rough model abilities. Probably 3-10 nodes per graph, no noise in the dataset, one sentence per edge, causal language explicit. 
+
+One Q for later is if following iTAG then since we are using a fictional domain we can’t do the same transferability analyses to ensure our benchmark is actually useful / answers the same questions real datasets would. 
+
+We can eval edge orientation, edge discovery (we give variable names), and full graph discovery (no variable names or edges given). 
+
+When we add noise levels it would be good to try to find out / estimate these noise levels in real documents so we know at which levels the LLMs need to be strong. This is probably hard.
+
+Real world graphs and documents are large so eval on small ones may not be that meaningful, though it may expose a real LLM weakness. 
+
+Also would we ever actually want an LLM to create a full graph itself vs we have some partial graph and documents and we want the LLM to add / verify based on the documents?
+
+We probably need a strong model to validate the documents (maybe a cheaper one can do generation).
+
+Can add a memorisation control at some point. 
+
+itag experiments 2 and 3 not feasible directly but we do still want to do some experiments to make sure our benchmark is useful in the real world. 
+
+Do we want isolated nodes?
+
+Do we just want DAGs?
+
+Maybe we have a set of 10 or so small graphs hand designed to cover causal structures we specifically want to test. Then a set of sampled larger graphs.
+
+Probably its best to do real world, fictional, and anti-real world. For anti-real world if we flip a whole graph then model can notice everything is reversed. If we flip randomly we may not have a DAG - this could be fine? We could also sample acyclic permutations.
+
+For the small set we can enumerate all isomorphic DAGs for n=3,4 (only 6+31 total), precedent for this in Corr2Cause (Jin et al., ICLR 2024).
