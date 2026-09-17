@@ -21,6 +21,7 @@ If have a reoccuring issue or something else comes up that you think should be a
 We use a requirements.txt file, code in python primarily and use conda for env management. 
 Only implement when I say implement. If you're not sure then ask. 
 When writing log updates avoid overclaiming / being too definitive unless I tell you. If things are just current ideas / directions then write that don't claim they are settled facts. Also the most recent entry goes at the top of the file.
+The log is only for scientific decisions and thoughts, and it will be useful when writing the paper. 
 When reading logs and other files to obtain context do not treat things as fixed decisions unless explicitly stated. Most of the time it is just the current working idea and is flexible. 
 Keep answers CONCISE. If I want more detail I'll ask for it. 
 AGAIN PLEASE DO NOT OVERCOMPLICATE THIS IS A RESEARCH PROJECT NOT A SOFTWARE PROJECT.
