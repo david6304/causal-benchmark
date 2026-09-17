@@ -1,8 +1,9 @@
 # Log
 
-## 2026-09-17 — commitment pilot wired up
+## 2026-09-17 — commitment pilot design
 
-Implemented, not yet run against a model. Design in the entries above.
+Implemented, not yet run against a model. Design in the 2026-09-17 entries on
+the noise taxonomy and on n=3.
 
 **Corpus.** 38 template documents: n=3 (all 4 usable atoms) and n=4 (6 atoms), two
 domains, one draw each. 20 clean, 18 commitment. The n=3 triangle has no free pair
@@ -36,23 +37,15 @@ affected; `injected_is_shortcut` is recorded per item so the analysis can split 
 it. Whether it should instead be controlled is an open question, better answered
 once we know if either pressure does anything.
 
-**Two fixes from the 2026-09-15 to-do list.** `results.jsonl` is now keyed by
-(doc_id, sample, noise) rather than doc_id alone, so repeats and conditions no
-longer overwrite; `-k` sets samples per item. And the stale claim in the
-`documents.py` docstring about the empty graph being kept is corrected -- it has an
-isolated node and is dropped by the filter.
+**Repeats are now possible**, which they were not on 2026-09-15 -- that run was
+one sample per item and so could not separate a noise effect from sampling noise.
 
-**Concept draws are now seeded per item** (`irng`), so adding a noise condition or
-a graph size no longer shifts every later document's concepts. Note this does not
-rescue the 2026-09-15 natural corpus: `base` is drawn at max(SIZES), which changed
-from 3 to 4, so all 38 natural passages regenerate and need their faithfulness
-hand-checked again. `natural.jsonl` still holds the old passages under the old
-doc_ids and they are simply not matched.
-
-**Still to do before the run.** Generate the 38 natural passages from
-`gen_prompts.jsonl`; hand-check faithfulness, in particular that the retracted
-claim is actually written as a retraction rather than as a plain assertion or
-dropped; then run Haiku at k=3 over both styles.
+**The 2026-09-15 faithfulness check does not carry over.** Moving to n=4 changed
+the concept draws, so all 38 natural passages are regenerated and their
+faithfulness has to be read again rather than inherited. The thing to watch this
+time is whether the retracted claim is written as a retraction at all, rather
+than flattened into a plain assertion or dropped -- if it is flattened the item
+silently becomes a different graph.
 
 ## 2026-09-17 — the longer-term shape, and the route from the pilot
 
@@ -197,7 +190,8 @@ unqualified assertion of X->Y simply *is* ground truth -- it is a different grap
 not noise. It only becomes noise under a discourse operator that blocks positive
 commitment, which is what family 1 provides. Source-reliability framing ("an
 unverified report claims...") was considered and set aside as source evaluation
-rather than extraction, though it returns in the longer-term design below.
+rather than extraction, though it returns in the 2026-09-17 entry on the
+longer-term shape.
 
 ## 2026-09-17 — ReCITE read: the recoverability problem
 
@@ -241,7 +235,7 @@ supplying the concept list makes our task artificial.
 ## 2026-09-15 — noise as the next direction
 
 Agreed direction, but the ladder itself is not designed yet. The motivation is the
-saturation above: with the clean arm at ceiling there is nothing to difference
+saturation reported the same day: with the clean arm at ceiling there is nothing to difference
 against, so noise is what has to create variance before any of the diagnostic
 contrasts can be measured.
 
@@ -274,9 +268,6 @@ real documents actually sit at, so we know which rungs matter. Still no good ide
 for estimating that, and it may need a small real-document sample to calibrate
 against rather than an argument.
 
-One practical note before any of this runs. `preds.jsonl` currently holds a single
-run keyed only by doc_id, so repeats or a second condition would overwrite it. It
-needs a run or condition identifier before the first noise comparison, not after.
 
 ## 2026-09-15 — Haiku on the natural arm: saturated
 
@@ -350,7 +341,7 @@ ladder, since "irrelevant material" is one of the noise levels and it is current
 leaking into the baseline uncontrolled.
 
 **Correction, same day.** The 24 above included 8 real-domain documents, which
-should not have been built -- the real-domain arms are parked and the entry above
+should not have been built -- the real-domain arms are parked and this entry
 overstates the corpus. `documents.py` now has `PLAUSIBLE = False` gating the
 `REAL_DOMAINS` block, and the corpus is 16 fictional documents per style: two
 domains, two draws, four atoms. The 8 plausible passages remain in
@@ -393,13 +384,10 @@ statistic rather than an acceptance filter, for the circularity reason: filterin
 documents on whether a strong model recovers them caps item difficulty at the
 verifier's ability.
 
-**Wiring** (same day). `documents.py` now emits a `style` field. Template records
-are built as before; natural records are built from `natural.jsonl` if it exists,
-matched to their template counterpart on graph, concepts and node mapping, so the
-template arm is the ceiling for its own pair rather than for the corpus average.
-With no API wired up the script writes the generation prompts to
-`gen_prompts.jsonl` and merges the passages back later. Dropping atoms with an
-isolated node takes the template corpus from 36 documents to 24.
+**Matching** (same day). Each natural document is matched to its template
+counterpart on graph, concepts and node mapping, so the template arm is the
+ceiling for its own pair rather than for the corpus average. Dropping atoms with
+an isolated node takes the template corpus from 36 documents to 24.
 
 ## 2026-09-15 — natural-text generation prompt, locked for now
 
@@ -496,7 +484,7 @@ parked. Notes on where the thinking got to, none of it settled.
 
 **Sourcing the real relationships.** Current view is that robustness does not come from
 better sourcing but from *measuring* the prior instead of assuming it — the text-free
-control already parked above, run per item and per model. Items where the prior turns out
+control parked in the 2026-09-08 entry, run per item and per model. Items where the prior turns out
 weak would otherwise degenerate into the fictional condition and dilute the contrast without
 showing it in the scores. If an LLM proposes the triples, the proposer should not also be
 the judge; iTAG hit the same issue and keep the verifier backbone disjoint (App. B.4.2).

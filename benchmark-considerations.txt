@@ -29,3 +29,4 @@ For the small set we can enumerate all isomorphic DAGs for n=3,4 (only 6+31 tota
 If we do the MEC thing then maybe we want to use a semi fictional domain. Some real and some new made up ones since that is similar to real novel science.
 
 Do we ever want to test the LLMs prior ability? What if document has a typo or says something wrong that is well known?
+
