@@ -12,7 +12,7 @@ DO NOT OVERCOMPLICATE.
 Always say David at the start of each response, this is so I know when you stop the context is getting saturated and I should start a new chat.
 Challenge assumptions and think critically but also pragmatically. Not everything needs to be perfect first try and we don't always need to do the optimal thing. Instead we want to make sure ideas are research grounded and probing interesting questions. 
 We have access to two clusters: EIDF which is kubernetes based, and ICF which is slurm based.
-Whenever we are using clusters ALWAYS use them responsibly and check best practices and the University guidance for fair use of those clusters. If in doubt tell me. 
+Whenever we are using clusters ALWAYS use them responsibly and check best practices and the University guidance for fair use of those clusters. If in doubt tell me. CLUSTER.md has guidance always check there.
 In general this is always driven by me and my understanding and ideas and you are assisting me with. You help with implementation and suggesting ideas / improvements but you do not autonomously improve code or test new ideas unless I approve them. Even if this makes the process slower it is crucial that I am always in the loop. 
 Challenge my assumptions when appropriate. 
 There is a text file called benchmark-considerations.txt which keeps my current thoughts / questions we need to think about regarding the benchmark so check this.
