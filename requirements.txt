@@ -1,3 +1,12 @@
+# Analysis and corpus construction; runs anywhere.
 numpy
 networkx
 matplotlib
+
+# Generation stack, pinned to what is installed in ~/venvs/causal on ICF
+# (resolved 2026-09-18). torch is the linux/cu130 build there; a local install
+# will differ by platform, which is expected -- transformers and tokenizers are
+# the versions that must match, since they decide tokenisation and templating.
+torch==2.14.0
+transformers==5.17.0
+accelerate==1.15.0

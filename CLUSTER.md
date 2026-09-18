@@ -3,10 +3,11 @@
 Operational guidance for this repository. Cluster availability and hardware
 change: verify live state before relying on dated observations.
 
-`ssh icf` reaches the head node (`hastings.inf.ed.ac.uk`) as the RA account
-`dmurra4`, via the `staff-gw` jump host. The student account `s2296274` and its
-home directory are unrelated to this project and are not used here. Select
-resources by Slurm partition, not by SSH alias.
+`ssh icf-ra` reaches the head node (`hastings.inf.ed.ac.uk`) as the RA account
+`dmurra4`, via the `staff-gw` jump host. The shorter `ssh icf` alias is retained
+and resolves to the same account. The student account `s2296274` and its home
+directory are unrelated to this project and are not used here. Select resources
+by Slurm partition, not by SSH alias.
 
 ## Access Baseline
 
@@ -34,15 +35,15 @@ Do not infer current access from this document alone.
 ## Connect And Activate
 
 ```bash
-ssh icf
+ssh icf-ra
 source /home/htang2/toolchain-20251006/toolchain.rc
 source ~/venvs/causal/bin/activate
 ```
 
 The local `~/.ssh/config` sets `ControlMaster auto` with an 8h `ControlPersist`
-on `icf`, `icf2`, `mlp` and `staff-gw`. One interactive `ssh icf` opens the
-master socket; subsequent non-interactive commands reuse it without
-re-authenticating, which is what lets an agent run read-only checks.
+on the RA aliases and `staff-gw`. One interactive connection opens the master
+socket; subsequent non-interactive commands reuse it without re-authenticating,
+which is what lets an agent run read-only checks.
 
 There is no `conda` and no `module` system on the cluster, so the project uses
 `venv` there even though local development uses conda. The head node's system
@@ -50,11 +51,29 @@ Python is 3.12.3. `toolchain.rc` prepends its own `bin` and a CUDA 12.8
 toolchain to `PATH`/`LD_LIBRARY_PATH`; it does not provide a Python. Install
 packages on the head node, which has internet; compute nodes may not.
 
-Keep the cluster checkout at an explicit commit:
+The canonical repository is now
+`https://github.com/david6304/causal-benchmark.git`, branch `master`. For a new
+cluster checkout:
+
+```bash
+git clone https://github.com/david6304/causal-benchmark.git ~/causal-benchmark
+```
+
+The checkout created before the repository was published has no remote. Add it
+once, after checking that no local or untracked work would be overwritten:
 
 ```bash
 cd ~/causal-benchmark
-git fetch
+git status --short
+git remote add origin https://github.com/david6304/causal-benchmark.git
+git fetch origin
+```
+
+For each reportable run, synchronise and use an explicit commit:
+
+```bash
+cd ~/causal-benchmark
+git fetch origin
 git checkout <COMMIT>
 git status --short
 ```
@@ -91,7 +110,7 @@ Examples:
 # Short interactive validation
 srun -p Interactive --gres=gpu:1 --time=00:30:00 --pty bash
 
-# Single 48 GB GPU, enough for a ~14B model in bf16
+# Single 48 GB GPU for the current Gemma-4-12B bf16 generation
 sbatch -p ICF-Research --gres=gpu:nvidia_l40s:1 --time=02:00:00 run.sh
 
 # A MIG slice instead of a whole H200, when the job does not need the card
@@ -177,13 +196,14 @@ target and action.
 | --- | --- |
 | `/home/dmurra4` | persistent checkout, venvs, small metadata; Lustre, no quota set as of 2026-09-18 |
 | `~/.cache/huggingface` | Hugging Face cache (default; do NOT set `HF_HOME`) |
-| `/disk/scratch/$USER` | node-local, fast, ephemeral; the job must `mkdir -p` it, treat as disposable |
+| `/disk/scratch/$USER` | node-local, fast, ephemeral; create it inside the job and treat it as disposable |
 
 - Keep irreplaceable metadata on persistent storage.
-- `/disk/scratch` is a symlink to `/disk/scratch_big` (9.1 TB, 8.0 TB free on
-  `landonia01`, 2026-09-18) and is node-local, so a path written by one job is
-  not visible to a job that lands on another node. `/disk/scratch/$USER` does
-  not exist until the job creates it.
+- On `landonia01` (2026-09-18) `/disk/scratch` is a symlink to
+  `/disk/scratch_big`, 9.1 TB with 8.0 TB free, and `/disk/scratch/$USER` did
+  not exist until the job created it. Capacity and backing filesystem may differ
+  on other nodes. Scratch is node-local either way, so a path written by one job
+  is not visible to a job that lands elsewhere.
 - Home is Lustre and handles large sequential files far better than thousands of
   tiny ones; prefer one archive or shard.
 - Do not commit model weights, gated datasets, or generated corpora.
@@ -319,8 +339,10 @@ not defaults.
 ## Open Items
 
 - The toolchain lives in another user's home (`/home/htang2`). It works today;
-  it is not ours and could vanish. Its `whl/` holds locally built
-  `torch-2.8.0a0` and `numpy-2.2.3` wheels for cp312, unused here — vLLM pins
-  its own torch and ships CUDA libraries in the wheel.
-- The environment is `~/venvs/causal` (Python 3.12.3), created 2026-09-18 and
-  currently holding only pip.
+  it is not ours and could vanish.
+- `~/venvs/causal` uses Python 3.12.3. The current generation path requires
+  `torch`, `transformers` and `accelerate`; after installing or upgrading them,
+  verify imports and CUDA in a short allocation before relying on it.
+- `google/gemma-4-12B-it` was not yet present in the RA account's Hugging Face
+  cache on 2026-09-18. Prefetch it on the head node and pin the resolved model
+  revision before the first reportable generation.

@@ -1,5 +1,54 @@
 # Log
 
+## 2026-09-18 — the base document, and the template arm dropped
+
+Current working spec, not settled. The template style is gone from
+`documents.py` entirely: with fictional concepts it was never a ceiling we
+needed, and "A causes B. B causes C." is not a document. Every item is now
+LLM-written prose. `data/docs.jsonl` holds only items that have a generated
+passage, so it is empty until a generation run.
+
+**The principle the base condition rests on.** A reader should never have to
+*infer* a causal claim -- only to *recognise* one phrased in an unfamiliar way.
+With nonce concepts there is no world knowledge to fall back on, so implicitness
+deeper than surface phrasing does not make extraction harder, it makes the graph
+unrecoverable and the item stops measuring anything. Natural prose and
+guaranteed recoverability are compatible only if the variation lives in how a
+relation is worded, never in whether one is stated. Base is deliberately not a
+realistic document; realism is what the noise families are for.
+
+**What a base document does.** Asserts each edge exactly once, in its own
+sentence, as a categorical, author-committed, direct causal claim; makes
+direction syntactically unambiguous, with an active causal verb taking the cause
+as subject or an explicit "because of / driven by", and no symmetric
+constructions; varies freely among constructions that entail causation (lexical
+causatives, periphrastic causatives, consequence clauses); names every concept
+in full, with no pronouns or shortened forms; gives every other sentence at most
+one concept, with descriptive rather than relational filler; never puts three or
+more concepts in one sentence; carries no summary sentence; holds a fixed word
+budget per graph size with claim sentences in non-topological order.
+
+The full-name rule and the one-concept-per-filler-sentence rule are also what
+make a mechanical checker exact: an unintended edge can only enter the document
+by two concepts co-occurring in a sentence, so co-occurrence counting is close
+to exhaustive for over-extraction. That is the argument for keeping them even
+though they cost some naturalness.
+
+**Excluded from base, each a candidate noise family.** Hedging and epistemic
+modality; attribution and retraction (the pilot's current family); explicit
+negation, since base uses silence for absence; association-only phrasing;
+coreference; restating a chain as a direct claim; repeating an edge.
+
+**Open boundary.** Whether "as X rises, Y falls" belongs in base. It reads as
+natural causal prose but states only covariation. Current lean is to exclude it
+and make it a central case of the association family, keeping base strictly
+entailing -- but real papers write exactly that sentence when they mean
+causation, so the other reading is defensible. To discuss with Sangyeok.
+
+**Known limitation.** Real documents repeat, summarise and hedge. Base is
+natural in surface form but not in discourse structure. Redundancy is the
+cheapest thing to relax later and does not threaten recoverability.
+
 ## 2026-09-17 — commitment pilot design
 
 Implemented, not yet run against a model. Design in the 2026-09-17 entries on

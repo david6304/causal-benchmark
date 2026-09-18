@@ -170,7 +170,6 @@ if __name__ == "__main__":
                 "sample": sample,
                 "condition": r["condition"],
                 "noise": r["noise"],
-                "style": r["style"],
                 "graph_id": r["graph_id"],
                 "n": len(r["adjacency"]),
                 "injected_pair": r["injected_pair"],
@@ -188,6 +187,6 @@ if __name__ == "__main__":
 
     ok = [x for x in results if x["pred"] is not None]
     print(f"{len(results)} runs, {len(results) - len(ok)} parse failures")
-    for key in ("style", "noise", "n"):
+    for key in ("noise", "n"):
         print(f"\nby {key}:")
         summarise(results, key)

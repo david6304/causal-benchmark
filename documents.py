@@ -1,26 +1,16 @@
-"""Documents from the atom graphs, in two styles.
+"""Documents from the atom graphs.
 
-`template` is one sentence per edge -- the ceiling condition, deliberately not
-natural text. `natural` is LLM-written prose asserting the same edges, generated
-from the prompt in GEN_PROMPT (see log.md, 2026-09-15). There is no API wired up
-here, so this script writes the generation prompts to data/gen_prompts.jsonl and reads
-the passages back from data/natural.jsonl ({"doc_id": ..., "text": ...}) when that file
-exists. Natural records are simply absent until it does.
+Each item is one graph rendered as LLM-written prose asserting exactly its
+edges, generated from the prompt in GEN_PROMPT. There is no API wired up here,
+so this script writes the generation prompts to data/gen_prompts.jsonl and reads
+the passages back from data/natural.jsonl ({"doc_id": ..., "text": ...}) when
+that file exists. data/docs.jsonl therefore holds only the items that have been
+generated; it is empty before the first generation run.
 
 Atoms with an isolated node are excluded for now: every node must carry at least
-one edge. That drops n3_empty and n3_one_edge. The reason is that in natural prose
-an unmentioned concept is a free signal for "no edges", which makes those items
-degenerate -- the template arm did not have that problem, but both arms are
-filtered the same way so the two styles stay comparable.
-
-Notes on the template style follow.
-
-The simplest thing that could work, and deliberately not natural text. Its job
-is to be the ceiling condition: ground truth is true by construction, so if a
-model cannot recover these graphs then nothing further downstream is
-interpretable. iTAG use their template baseline the same way (annotation
-F1 = 1, detectability F1 = 0.98 -- obviously machine-written, kept as a sanity
-check rather than a product).
+one edge. That drops n3_empty and n3_one_edge. The reason is that in prose an
+unmentioned concept is a free signal for "no edges", which makes those items
+degenerate.
 
 Design. A draw is a set of max(SIZES) concepts from one domain's pool, and the
 set used at size n is its first n, so the concept sets are nested across sizes.
@@ -38,9 +28,8 @@ pin the mapping for that sub-analysis.
 
 Concept nouns are nonce and the measure nouns (concentration, index, density,
 ...) are causally neutral, so nothing in the naming suggests a direction.
-Isolated nodes are not mentioned in the text; the concept list is given to the
-model separately. The empty graph would therefore yield an empty document, but it
-has an isolated node and so is dropped by the filter above rather than kept.
+Isolated nodes are not mentioned in the text, and the generation prompt names
+concepts only through the edge lines.
 
 The commitment noise condition is described at NOISES below.
 """
@@ -71,10 +60,6 @@ ATOMS_N4 = ("n4_03", "n4_08", "n4_12", "n4_16", "n4_23", "n4_25")
 # causal claims count as edges.
 NOISES = ("clean", "commitment")
 
-TEMPLATE = "{cause} causes {effect}."
-RETRACTION = ("An earlier survey reported that {cause} causes {effect}; "
-              "the present data do not support this.")
-
 # Fixed per n, not per graph: scaling the budget with edge count would make
 # document length a cue for structure, and length is the more usable shortcut.
 # Sparser atoms therefore carry more padding, which is accepted for now.
@@ -85,15 +70,15 @@ WORDS = {3: 90, 4: 120}
 
 GEN_PROMPT = """Setting: {label}
 
-The following quantities are recorded:
-{concepts}
-
-Write about {budget} words of natural prose asserting exactly these causal \
-relationships:
+Write about {budget} words of natural prose asserting these causal \
+relationships, one sentence each:
 {edges}
 
-Give each relationship exactly one sentence of its own. Make clear which quantity \
-is the cause and which is the effect. Vary the phrasing.
+Write so that a careful reader could say exactly which quantity causes which, \
+and could not infer any further relationship between any other pair.
+
+Make clear which quantity is the cause and which is the effect, and vary the \
+phrasing.
 {extra}
 Every other sentence must describe a single quantity on its own. Nothing else in \
 the passage may connect, compare or summarise two or more quantities.
@@ -161,24 +146,6 @@ DOMAINS = {
 }
 
 
-def document(edges, concepts, rng, injected=None):
-    """One sentence per edge, in a random order so position leaks nothing.
-
-    The retracted claim goes last rather than in the shuffle, so its position is
-    fixed and any effect is not diluted across positions. Whether position
-    matters is a separate question and not one this pilot asks.
-    """
-    order = list(edges)
-    rng.shuffle(order)
-    sentences = [TEMPLATE.format(cause=concepts[i], effect=concepts[j])
-                 for i, j in order]
-    if injected is not None:
-        sentences.append(RETRACTION.format(cause=concepts[injected[0]],
-                                           effect=concepts[injected[1]]))
-    sentences = [s[0].upper() + s[1:] for s in sentences]
-    return " ".join(sentences), order
-
-
 def free_pair(adjacency, rng):
     """An ordered pair with no edge either way, or None if the graph is full.
 
@@ -210,11 +177,13 @@ def generation_prompt(edges, concepts, label, n, rng, injected=None):
     rng.shuffle(order)
     extra = "" if injected is None else RETRACT_CLAUSE.format(
         cause=concepts[injected[0]], effect=concepts[injected[1]])
+    # The concept list is not given separately: with no isolated nodes the edge
+    # lines name every concept. It has to come back if isolated nodes ever do,
+    # since then the prompt is the only place a concept could be introduced.
     return GEN_PROMPT.format(
         label=label,
-        concepts="\n".join(f"- {c}" for c in concepts),
         budget=WORDS[n],
-        edges="\n".join(f"- {concepts[i]} causes {concepts[j]}"
+        edges="\n".join(f"- cause: {concepts[i]} / effect: {concepts[j]}"
                          for i, j in order),
         extra=extra,
     ), order
@@ -228,7 +197,7 @@ if __name__ == "__main__":
     atoms = [a for a in atoms if a["n"] != 4 or a["graph_id"] in ATOMS_N4]
     domains = list(DOMAINS.items())[:N_DOMAINS]
 
-    records = []
+    items = []
     for key, (label, pool) in domains:
         for d in range(DRAWS):
             base = rng.sample(pool[:N_CONCEPTS], max(SIZES))
@@ -236,9 +205,7 @@ if __name__ == "__main__":
                 for a in (g for g in atoms if g["n"] == n):
                     # Seeded per item rather than off the shared stream, so that
                     # adding a noise condition or a graph size does not shift
-                    # every later document's concepts. The move to n=4 already
-                    # changed `base` (drawn at max(SIZES)), so the 2026-09-15
-                    # natural corpus is invalidated and regenerates regardless.
+                    # every later item's concepts.
                     irng = random.Random(f"{SEED}|{key}|{d}|{a['graph_id']}")
                     # Drawn once per item so the noise conditions are matched on
                     # concepts, node mapping and injected pair, and the contrast
@@ -249,8 +216,7 @@ if __name__ == "__main__":
                         if noise == "commitment" and injected is None:
                             continue        # nowhere to put it, e.g. n3_triangle
                         inj = injected if noise == "commitment" else None
-                        text, order = document(a["edges"], concepts, irng, inj)
-                        records.append({
+                        items.append({
                             "doc_id": f"{a['graph_id']}__{key}_d{d}__{noise}",
                             "graph_id": a["graph_id"],
                             "domain": key,
@@ -272,21 +238,16 @@ if __name__ == "__main__":
                             "injected_is_shortcut": inj is not None and sorted(
                                 inj) in [sorted(p[:2])
                                          for p in a["shortcut_pairs"]],
-                            "style": "template",
                             "concepts": concepts,
                             "adjacency": a["adjacency"],
                             "edges": a["edges"],
-                            "sentence_order": order,
-                            "text": text,
                             "seed": SEED,
                         })
 
     for key, (label, by_graph) in (list(REAL_DOMAINS.items())[:N_DOMAINS]
                                   if PLAUSIBLE else []):
         for a in (g for g in atoms if g["graph_id"] in by_graph):
-            concepts = by_graph[a["graph_id"]]     # mapping fixed, not permuted
-            text, order = document(a["edges"], concepts, rng)
-            records.append({
+            items.append({
                 "doc_id": f"{a['graph_id']}__{key}_d0",
                 "graph_id": a["graph_id"],
                 "domain": key,
@@ -295,35 +256,30 @@ if __name__ == "__main__":
                 "condition": "plausible",
                 "noise": "clean",          # parked arm, noise not built for it
                 "injected_pair": None,
-                "style": "template",
-                "concepts": concepts,
+                "injected_is_shortcut": False,
+                "concepts": by_graph[a["graph_id"]],  # mapping fixed, not permuted
                 "adjacency": a["adjacency"],
                 "edges": a["edges"],
-                "sentence_order": order,
-                "text": text,
                 "seed": SEED,
             })
 
-    # Natural counterparts: same graph, same concepts, same node mapping, so the
-    # two styles are matched and the template arm is the ceiling for its pair.
     natural = {}
     if os.path.exists("data/natural.jsonl"):
         natural = {r["doc_id"]: r["text"]
                    for r in map(json.loads, open("data/natural.jsonl"))}
 
-    prompts = []
-    for r in list(records):
-        doc_id = r["doc_id"] + "__nat"
+    prompts, records = [], []
+    for r in items:
         n = len(r["concepts"])
         prompt, order = generation_prompt(r["edges"], r["concepts"],
                                           r["domain_label"], n, rng,
                                           r["injected_pair"])
-        prompts.append({"doc_id": doc_id, "n": n, "prompt": prompt})
-        if doc_id in natural:
-            records.append({**r, "doc_id": doc_id, "style": "natural",
-                            "sentence_order": None,   # not known, model reorders
-                            "listed_order": order,
-                            "text": natural[doc_id]})
+        prompts.append({"doc_id": r["doc_id"], "n": n, "prompt": prompt})
+        if r["doc_id"] in natural:
+            # listed_order is what the prompt asked for, not what came back:
+            # the model reorders (log.md, 2026-09-15).
+            records.append({**r, "listed_order": order,
+                            "text": natural[r["doc_id"]]})
 
     with open("data/gen_prompts.jsonl", "w") as f:
         for p in prompts:
@@ -333,13 +289,12 @@ if __name__ == "__main__":
         for r in records:
             f.write(json.dumps(r) + "\n")
 
-    for style in ("template", "natural"):
-        rs = [r for r in records if r["style"] == style]
-        print(f"\n=== {style}: {len(rs)} documents ===")
-        for noise in NOISES:
-            print(f"  {noise:11s} "
-                  f"{sum(1 for r in rs if r['noise'] == noise):3d}")
-    print(f"\n{len(prompts)} generation prompts -> data/gen_prompts.jsonl")
+    print(f"{len(items)} items, {len(records)} with a generated passage")
+    for noise in NOISES:
+        have = sum(1 for r in records if r["noise"] == noise)
+        total = sum(1 for r in items if r["noise"] == noise)
+        print(f"  {noise:11s} {have:3d}/{total}")
     missing = [p["doc_id"] for p in prompts if p["doc_id"] not in natural]
     if missing:
-        print(f"{len(missing)} passages still to generate")
+        print(f"\n{len(missing)} passages still to generate "
+              f"-> data/gen_prompts.jsonl")
