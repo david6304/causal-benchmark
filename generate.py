@@ -31,7 +31,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL = "google/gemma-4-12B-it"
-REVISION = None          # pin to a commit hash once prefetched; None = default
+REVISION = "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7"   # pinned 2026-09-18
 SEED = 0
 MAX_NEW_TOKENS = 400     # ~90 words of prose, with room for a long passage
 BATCH = 8
@@ -67,7 +67,8 @@ def main(limit=None, temp=0.0, out="data/natural.jsonl"):
             out_ids = model.generate(
                 **enc, max_new_tokens=MAX_NEW_TOKENS,
                 do_sample=temp > 0, temperature=temp if temp > 0 else None,
-                pad_token_id=tok.pad_token_id or tok.eos_token_id)
+                pad_token_id=tok.pad_token_id if tok.pad_token_id
+                is not None else tok.eos_token_id)
         for p, ids in zip(batch, out_ids):
             text = tok.decode(ids[enc["input_ids"].shape[1]:],
                               skip_special_tokens=True).strip()
