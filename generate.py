@@ -15,8 +15,10 @@ runs cannot be re-generated after a prompt fix. `--temp` is there if greedy
 prose turns out to be degenerate, in which case the seed is recorded and the
 corpus is still reproducible, just not deterministic across library versions.
 
-Thinking is disabled. Gemma 4 emits a reasoning block by default, which is not
-what we want in the document and would have to be stripped post hoc.
+Thinking is off. The chat template defaults `enable_thinking` to false and
+pre-fills an empty thought channel, so no reasoning block appears and nothing
+needs stripping post hoc. The flag is passed explicitly anyway, so the documents
+do not depend on a template default that a reupload could change.
 
 Each record carries the model id, the revision it was generated from and the
 decoding settings, so a corpus file is self-describing and a silent upstream
