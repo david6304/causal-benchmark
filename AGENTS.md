@@ -25,4 +25,5 @@ The log is only for scientific decisions and thoughts, and it will be useful whe
 When reading logs and other files to obtain context do not treat things as fixed decisions unless explicitly stated. Most of the time it is just the current working idea and is flexible. 
 Keep answers CONCISE. If I want more detail I'll ask for it. 
 You never change .txt files only .md files. Unless I specifically tell you and in those cases you write to match the rest of the text doc so it will stay very short and human.
+Don't get caught in the weeds of a problem. Often take a step back and think is there a bigger picture reason for an issue or set of issues so we don't go down rabbit holes of small fixes. 
 AGAIN PLEASE DO NOT OVERCOMPLICATE THIS IS A RESEARCH PROJECT NOT A SOFTWARE PROJECT.
