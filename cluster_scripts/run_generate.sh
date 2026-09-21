@@ -10,8 +10,12 @@
 #          run_generate.sh --limit 6 --out data/natural_smoke.jsonl
 # Anything after the script name is forwarded to generate.py.
 set -euo pipefail
+# toolchain.rc and the venv activate script both expand unset variables
+# (LD_LIBRARY_PATH, PS1), so -u has to come off around them.
+set +u
 source /home/htang2/toolchain-20251006/toolchain.rc
 source ~/venvs/causal/bin/activate
+set -u
 cd ~/causal-benchmark
 
 # Weights are prefetched on the head node; fail loudly rather than fall back to
