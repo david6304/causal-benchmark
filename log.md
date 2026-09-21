@@ -1,5 +1,29 @@
 # Log
 
+## 2026-09-21 — first generation run
+
+38 base passages from `google/gemma-4-12B-it` (rev 707f0a3b, greedy, seed 0) on
+ICF. Recoverability held in all 38: no sentence named three or more concepts, no
+document asserted a pair that was not a true edge, and no restatement reversed a
+direction.
+
+The rule that broke was "each edge asserted exactly once". 7 of 20 clean
+documents restated an edge; the commitment arm was 18/18 clean. Working
+explanation is the word budget — prompts ask ~90 words and the model writes ~60,
+so the clean arm pads, and it pads by restating claims rather than by inventing
+descriptive filler. The commitment arm has the retraction sentence to spend
+words on. Filler can also contradict a claim (one passage has a score "remains
+constant" two sentences before it "increases"), which adds no edge but reads
+badly.
+
+Current lean is to drop the explicit word budget rather than tune it, since
+picking a number per graph size does not scale. One option is to constrain
+structure instead — a descriptive sentence between consecutive claims — so
+length follows from the edge count. If redundancy persists, generating claim and
+filler sentences separately and interleaving them would make "exactly once" true
+by construction; the spec already bars pronouns, coreference and summaries, so
+sentences are close to independent anyway. Not settled.
+
 ## 2026-09-18 — the base document, and the template arm dropped
 
 Current working spec, not settled. The template style is gone from
